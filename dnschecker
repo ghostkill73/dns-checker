@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# ----------------------------------------------------------------------+
+# autor   : Abner Benedito
+# github  : ghostkill73
+# creation: 2024-06-09
+# version : 0.0.1 (2024-06-09)
+# license : GPLv3+
+# ----------------------------------------------------------------------+
+# LICENSE
+#
+# Copyright (C) 2024  Abner Benedito
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
+# ----------------------------------------------------------------------+
+# CONFIGURATIONS
+
+# ----------------------------------------------------------------------+
+# VARIABLES
+
+VERSION="v0.0.1"
+
+cred="\e[38;2;255;0;0m"
+cgreen="\e[38;2;0;255;0m"
+cnc="\e[0m"
+
+
+# ----------------------------------------------------------------------+
+# FUNCTIONS
+
+showHelp() {
+# md5, sha1, sha224, sha256, sha384, sha512 & b2
+printf '%s\n' "dns-checker  Copyright (C) 2024  Abner Benedito
+ This program comes with ABSOLUTELY NO WARRANTY
+ This is free software, and you are welcome to redistribute it
+ under certain conditions.
+
+Usage: dns-checker -w<wordlist.txt> <@.example.com> [OPTIONS...]
+dns-checker lists the respective subdomains of a site given a wordlist.
+
+      --help                 display this help and exit
+  -V, --version              output version information and exit
+  -L, --license              display the license program and exit
+  -v, --verbose              display subdomains results
+
+  example: ./dns-checker -wsubdomains.txt @.example.com -v
+
+contribute and report bugs in: <github.com/ghostkill73/dns-checker>"
+}
+
+showError() {
+local option="$1"
+printf '%s\n' "  the option "\'$option\'" was not found.
+  type '--help' option for more information."
+}
+
+showVersion() {
+printf '%s\n' "  dns-checker "$VERSION" <github.com/ghostkill73/dns-checker>"
+}
+
+shortLicense() {
+printf '%s\n' " dns-checker  Copyright (C) 2024  Abner Benedito
+ This program comes with ABSOLUTELY NO WARRANTY
+ This is free software, and you are welcome to redistribute it
+ under certain conditions. use '--license' for more information.
+
+ use "--help" option for more information."
+}
+
+license() {
+printf '%s\n' " dns-checker Copyright (C) 2024  Abner Benedito
+
+ This program is free software: you can redistribute it and/or modify
+ it under the terms of the GNU General Public License as published by
+ the Free Software Foundation, either version 3 of the License, or
+ (at your option) any later version.
+
+ This program is distributed in the hope that it will be useful,
+ but WITHOUT ANY WARRANTY; without even the implied warranty of
+ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ GNU General Public License for more details.
+
+ You should have received a copy of the GNU General Public License
+ along with this program.  If not, see <https://www.gnu.org/licenses/>."
+}
+
+extract() {
+	local archive="$1"
+	local numLine="$2"
+
+	linha=$(while IFS= read -r line || [[ -n "$line" ]]; do
+   		((count++))
+   		if [ $count -eq ${numLine} ]; then
+       		printf '%s\n' "$line"
+			break
+   		fi
+	done < "$archive")
+
+printf '%s\n' "$linha"
+}
+
+main() {
+	local word="$1"
+	local site="$2"
+
+	local lines="$(wc -l "$word" 2>&-)"
+	local lines="${lines%% *}"
+
+	[[ -e "${site/@./SUB}" ]] && {
+		read -p "${site/@./SUB} already exists, do you want to delete it?" confirmDelete
+		case ${confirmDelete} in
+		[yY]*) rm -vf "${site/@./SUB}"; read "press enter to continue..." ;;
+		[nN]*) exit 0 ;;
+		*) exit 1 ;;
+		esac
+	}
+	if [[ "$3" = '--verbose' ]] || [[ "$3" = '-v' ]]; then
+	for i in $(seq ${lines}); {
+		local subdomain="$(extract "$word" "$i")"
+		local subdomain="${site//@/"$subdomain"}"
+		local host="$(host -W 0 "$subdomain" | grep -v "IPv6")"
+
+		if [[ ! "$host" =~ '3(NXDOMAIN)' ]]; then
+			printf '\e[38;2;0;255;0m%s\e[0m\n' "[+] ${host}"
+			printf '%s\n' "[+] ${host}" >> ${site/@./SUB}.txt
+		else
+			printf '\e[38;2;255;0;0m%s\e[0m\n' "[-] ${host}"
+		fi
+	}
+	else
+	for i in $(seq ${lines}); {
+		local subdomain="$(extract "$word" "$i")"
+		local subdomain="${site//@/"$subdomain"}"
+		local host="$(host -W 0 "$subdomain" | grep -v "IPv6")"
+
+		[[ ! "$host" =~ '3(NXDOMAIN)' ]] && {
+		printf '%s\n' "[+] ${host}" >> ${site/@./SUB}.txt
+		}
+	}
+	fi
+}
+
+# ----------------------------------------------------------------------+
+############################ BEGIN SCRIPT ############################
+
+if [[ "$#" = '0' ]]; then
+	shortLicense
+else
+	case ${1} in
+
+		--help) showHelp ;;
+
+		-L|--license) license ;;
+
+		-V|--version) showVersion ;;
+
+		-w*)
+			main ${1/-w/} ${2} ${3}
+		;;
+
+		*) showError "$1" ;;
+	esac
+fi
+
+############################# END SCRIPT #############################
+# ----------------------------------------------------------------------+
