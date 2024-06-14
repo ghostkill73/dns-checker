@@ -3,7 +3,7 @@
 # autor   : Abner Benedito
 # github  : ghostkill73
 # creation: 2024-06-09
-# version : 0.0.1 (2024-06-09)
+# version : 0.0.1.1 (2024-06-14)
 # license : GPLv3+
 # ----------------------------------------------------------------------+
 # LICENSE
@@ -24,17 +24,9 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
 # ----------------------------------------------------------------------+
-# CONFIGURATIONS
+# CONFIG
 
-# ----------------------------------------------------------------------+
-# VARIABLES
-
-VERSION="v0.0.1"
-
-cred="\e[38;2;255;0;0m"
-cgreen="\e[38;2;0;255;0m"
-cnc="\e[0m"
-
+VERSION="v0.0.1.1"
 
 # ----------------------------------------------------------------------+
 # FUNCTIONS
@@ -110,26 +102,47 @@ extract() {
 printf '%s\n' "$linha"
 }
 
+extractlines() {
+	local file="$1"
+	mapfile -tn 0 lines < "$file"
+	printf '%s\n' "${#lines[@]}"
+}
+
 main() {
 	local word="$1"
 	local site="$2"
 
-	local lines="$(wc -l "$word" 2>&-)"
+	[[ -z "$(type -P host)" ]] && {
+		printf '%s\n' 'the 'host' utility was not found. exiting...'
+		exit 1
+	}
+
+	[[ ! -e "$word" ]] && {
+		printf '%s\n' "wordlist not found. exiting..."
+		exit 1
+	}
+
+	local lines="$(extractlines "$word" 2>&-)"
 	local lines="${lines%% *}"
 
-	[[ -e "${site/@./SUB}" ]] && {
-		read -p "${site/@./SUB} already exists, do you want to delete it?" confirmDelete
+	[[ -e "${site/@./SUB}.txt" ]] && {
+		read -p "${site/@./SUB}.txt already exists, do you want to delete it? (y/N) " confirmDelete
 		case ${confirmDelete} in
-		[yY]*) rm -vf "${site/@./SUB}"; read "press enter to continue..." ;;
+		[yY]*)
+		rm -vf "${site/@./SUB}"
+		read -p "press enter to continue..."
+		;;
 		[nN]*) exit 0 ;;
 		*) exit 1 ;;
 		esac
 	}
+
 	if [[ "$3" = '--verbose' ]] || [[ "$3" = '-v' ]]; then
-	for i in $(seq ${lines}); {
+	for i in $(seq "$lines"); {
 		local subdomain="$(extract "$word" "$i")"
 		local subdomain="${site//@/"$subdomain"}"
-		local host="$(host -W 0 "$subdomain" | grep -v "IPv6")"
+#		local host="$(host -W 0 "$subdomain" | grep -v "IPv6")"
+		local host="$(host -W 0 "$subdomain")"
 
 		if [[ ! "$host" =~ '3(NXDOMAIN)' ]]; then
 			printf '\e[38;2;0;255;0m%s\e[0m\n' "[+] ${host}"
@@ -139,10 +152,11 @@ main() {
 		fi
 	}
 	else
-	for i in $(seq ${lines}); {
+	for i in $(seq "$lines"); {
 		local subdomain="$(extract "$word" "$i")"
 		local subdomain="${site//@/"$subdomain"}"
-		local host="$(host -W 0 "$subdomain" | grep -v "IPv6")"
+#		local host="$(host -W 0 "$subdomain" | grep -v "IPv6")"
+		local host="$(host -W 0 "$subdomain")"
 
 		[[ ! "$host" =~ '3(NXDOMAIN)' ]] && {
 		printf '%s\n' "[+] ${host}" >> ${site/@./SUB}.txt
@@ -165,9 +179,7 @@ else
 
 		-V|--version) showVersion ;;
 
-		-w*)
-			main ${1/-w/} ${2} ${3}
-		;;
+		-w*) main ${1/-w/} ${2} ${3} ;;
 
 		*) showError "$1" ;;
 	esac
